@@ -843,7 +843,6 @@ function frame(now) {
     acc += dt;
     while (acc >= FIXED && (state === 'play' || state === 'won')) { sim(FIXED); acc -= FIXED; }
     if (state === 'play') elapsed += dt;
-    edgeTurn(dt);
   }
   applyCamera(dt);
   animate(dt, clock);
@@ -866,7 +865,9 @@ function begin() {
 tela.addEventListener('click', begin);
 
 document.addEventListener('pointerlockchange', () => {
-  if (document.pointerLockElement || noLock) return;
+  // Uma recusa anterior não vale mais depois que a captura funciona.
+  if (document.pointerLockElement) { noLock = false; return; }
+  if (noLock) return;
   if (state === 'play' || state === 'won') {
     Object.keys(keys).forEach((k) => { keys[k] = false; });
     state = beam.visible ? 'won' : 'pause';
@@ -901,22 +902,11 @@ addEventListener('mousedown', (e) => {
   }
 });
 // A câmera segue o mouse sem clique, com ou sem captura do cursor pelo navegador.
-const mouse = { x: 0, y: 0, inside: false };
 addEventListener('mousemove', (e) => {
-  mouse.x = e.clientX; mouse.y = e.clientY; mouse.inside = true;
   if (state !== 'play' && state !== 'won') return;
   P.yaw -= e.movementX * 0.0023;
   P.pitch = THREE.MathUtils.clamp(P.pitch - e.movementY * 0.0023, -1.5, 1.5);
 });
-document.documentElement.addEventListener('mouseleave', () => { mouse.inside = false; });
-// Sem captura, o cursor bate na borda da janela: encostar nela continua girando.
-function edgeTurn(dt) {
-  if (document.pointerLockElement || !mouse.inside) return;
-  const M = 0.1;
-  const edge = (v) => (v < M ? -(1 - v / M) : v > 1 - M ? 1 - (1 - v) / M : 0);
-  P.yaw -= edge(mouse.x / innerWidth) * 2.6 * dt;
-  P.pitch = THREE.MathUtils.clamp(P.pitch - edge(mouse.y / innerHeight) * 1.5 * dt, -1.5, 1.5);
-}
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
