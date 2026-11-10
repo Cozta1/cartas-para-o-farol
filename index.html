@@ -1,0 +1,932 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartas para o Farol</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #f6ead7;
+    --paper: #f1e4c8;
+    --paper-ink: #2c2433;
+    --night: #161b33;
+    --ember: #f2a065;
+    --type: "Special Elite", "Courier New", monospace;
+  }
+  html, body { height: 100%; margin: 0; background: var(--night); overflow: hidden; }
+  canvas { position: fixed; inset: 0; display: block; cursor: none; }
+  .hud { position: fixed; color: var(--ink); font: 18px/1.3 var(--type); text-shadow: 0 1px 3px #0009; pointer-events: none; }
+  #contagem { top: 18px; left: 22px; font-size: 22px; }
+  #tempo { top: 18px; right: 22px; font-variant-numeric: tabular-nums; }
+  #dash { bottom: 24px; left: 50%; width: 120px; height: 5px; margin-left: -60px; background: #fff3; border-radius: 3px; overflow: hidden; }
+  #dash i { display: block; height: 100%; width: 100%; background: var(--ember); }
+  #mira { top: 50%; left: 50%; width: 5px; height: 5px; margin: -2.5px; border-radius: 50%; background: #fff9; }
+  #carta {
+    left: 50%; bottom: 60px; width: min(480px, calc(100vw - 40px)); transform: translateX(-50%) rotate(-1deg);
+    padding: 14px 18px; background: var(--paper); color: var(--paper-ink); text-shadow: none;
+    box-shadow: 0 6px 22px #0007; opacity: 0; transition: opacity .35s;
+  }
+  #carta b { display: block; font-weight: normal; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 4px; }
+  #carta.on { opacity: 1; }
+  /* Chamada de rádio: painel lateral, o jogo continua rodando atrás dele. */
+  #radio {
+    position: fixed; top: 64px; right: 22px; width: min(420px, calc(100vw - 44px)); max-height: calc(100vh - 150px);
+    overflow-y: auto; padding: 16px 18px; border: 2px solid #ffc978; border-radius: 6px;
+    background: #0f141ee8; color: #ffe2b0; font: 16px/1.42 var(--type); box-shadow: 0 0 26px #ffc97855;
+  }
+  #radio[hidden] { display: none; }
+  #radio .tag { display: inline-block; padding: 1px 8px; background: #ff6b4a; color: #16100c; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+  #radio h2 { margin: 8px 0 0; font: inherit; font-size: 23px; color: #fff; }
+  #radio .tom { font-size: 13px; opacity: .72; }
+  #radio p { margin: 8px 0 10px; }
+  #radioTempo { height: 5px; background: #ffffff26; margin-bottom: 10px; }
+  #radioTempo i { display: block; height: 100%; width: 100%; background: #ff6b4a; }
+  #radioTempo[hidden] { display: none; }
+  #radio button {
+    display: flex; gap: 10px; align-items: center; width: 100%; margin-top: 8px; padding: 10px 12px; text-align: left; cursor: pointer;
+    font: inherit; color: #fff; background: #2a3550; border: 1px solid #ffc97866;
+  }
+  #radio button kbd { flex: none; width: 30px; height: 30px; display: grid; place-items: center; background: #ffc978; color: #16100c; font: 20px var(--type); border-radius: 4px; }
+  #radio button:hover, #radio button:focus-visible { background: #3b4a70; outline: 2px solid #ffc978; }
+  /* Epílogo: volta a ser papel, centralizado. */
+  #radio.centro {
+    top: 50%; left: 50%; right: auto; transform: translate(-50%, -50%) rotate(-.6deg); width: min(620px, calc(100vw - 40px)); max-height: 82vh;
+    padding: 22px 26px; border: 0; border-radius: 0; background: var(--paper); color: var(--paper-ink); font-size: 17px; box-shadow: 0 10px 40px #000a;
+  }
+  #radio.centro h2 { color: var(--paper-ink); }
+  #radio.centro .tag { background: none; border: 1px solid #a8322d; color: #a8322d; }
+  #radioHud { right: 22px; bottom: 20px; display: flex; align-items: center; gap: 9px; padding: 8px 12px; background: #0f141ecc; border: 1px solid #ffc97866; border-radius: 6px; font-size: 15px; }
+  #radioHud .led { width: 11px; height: 11px; border-radius: 50%; background: #55606f; }
+  #radioHud .eq { display: flex; align-items: flex-end; gap: 2px; height: 18px; }
+  #radioHud .eq s { width: 4px; height: 4px; background: #ffc978; }
+  #radioHud.ativa .led { background: #ff6b4a; box-shadow: 0 0 10px #ff6b4a; animation: pisca .5s steps(2) infinite; }
+  #radioHud.ativa .eq s { animation: eq .45s ease-in-out infinite alternate; }
+  #radioHud.ativa .eq s:nth-child(2) { animation-delay: -.3s; }
+  #radioHud.ativa .eq s:nth-child(3) { animation-delay: -.12s; }
+  #radioHud.ativa .eq s:nth-child(4) { animation-delay: -.4s; }
+  #radioHud.ativa .eq s:nth-child(5) { animation-delay: -.2s; }
+  @keyframes pisca { to { opacity: .25; } }
+  @keyframes eq { to { height: 18px; } }
+  @media (prefers-reduced-motion: reduce) { #radioHud.ativa .led, #radioHud.ativa .eq s { animation: none; } }
+  #diario { top: 52px; left: 22px; font-size: 15px; display: grid; gap: 3px; max-width: 340px; }
+  #diario .veio { color: #9df0a8; }
+  #diario .longe { color: #ffb36b; }
+  #diario .nada { color: #ff8f85; }
+  #flash { position: fixed; inset: 0; background: #dff1ff; opacity: 0; pointer-events: none; }
+  #tela {
+    position: fixed; inset: 0; display: grid; place-items: center; text-align: center; padding: 20px;
+    background: linear-gradient(#161b33cc, #161b3366); color: var(--ink); font-family: var(--type); cursor: pointer;
+  }
+  #tela[hidden] { display: none; }
+  #tela h1 { font-size: clamp(38px, 8vw, 76px); font-weight: normal; margin: 0 0 10px; color: var(--ember); }
+  #tela p { font-size: 18px; margin: 8px auto; max-width: 34em; line-height: 1.45; }
+  #tela kbd { font: inherit; border: 1px solid #f6ead788; border-radius: 4px; padding: 0 6px; }
+  #tela .vai { margin-top: 22px; font-size: 22px; color: var(--paper); }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div class="hud" id="contagem">Cartas 0/5</div>
+<div class="hud" id="tempo">0:00.0</div>
+<div class="hud" id="mira"></div>
+<div class="hud" id="dash"><i></i></div>
+<div class="hud" id="carta"><b></b><span></span></div>
+<div id="flash"></div>
+<div id="radio" hidden>
+  <span class="tag" id="radioTag"></span>
+  <h2 id="radioNome"></h2>
+  <div class="tom" id="radioTom"></div>
+  <p id="radioTexto"></p>
+  <div id="radioTempo" hidden><i></i></div>
+  <div id="radioEscolhas"></div>
+</div>
+<div class="hud" id="radioHud"><i class="led"></i><span id="radioHudTexto">Canal 16 · em silêncio</span><b class="eq"><s></s><s></s><s></s><s></s><s></s></b></div>
+<div class="hud" id="diario"></div>
+<div id="tela">
+  <div>
+    <h1 id="titulo">Cartas para o Farol</h1>
+    <p id="texto">O farol está apagado. Cada carta sintoniza um navio no rádio: responda sem parar de correr, e veja no mar o que sua resposta causou.</p>
+    <p id="ajuda"><kbd>W A S D</kbd> andar &nbsp; <kbd>Espaço</kbd> pular &nbsp; <kbd>Shift</kbd> dash &nbsp; <kbd>1</kbd> <kbd>2</kbd> responder ao rádio &nbsp; <kbd>R</kbd> recomeçar</p>
+    <p class="vai" id="vai">Clique para jogar</p>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+/* ---------- ajuste de movimento: mexa aqui para mudar a sensação ---------- */
+const MOVE = {
+  run: 9.5, groundAccel: 90, groundFriction: 70, airAccel: 34,
+  jump: 11.5, gravity: 28, fallMult: 1.9, maxFall: 40,
+  coyote: 0.11, buffer: 0.13,
+  dashSpeed: 24, dashTime: 0.16, dashCooldown: 0.35, keepAfterDash: 13,
+  height: 1.7, eye: 1.62, radius: 0.4, stepTolerance: 0.35,
+};
+const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- cena ---------- */
+const COLORS = {
+  top: new THREE.Color('#1b2a52'), mid: new THREE.Color('#8a4f7d'), horizon: new THREE.Color('#f2a065'),
+  sea: new THREE.Color('#1f4566'), seaLit: new THREE.Color('#e88e63'),
+};
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(COLORS.horizon, 70, 340);
+const camera = new THREE.PerspectiveCamera(80, innerWidth / innerHeight, 0.08, 1800);
+camera.rotation.order = 'YXZ';
+
+const SUN = new THREE.Vector3(-0.72, 0.2, -0.66).normalize();
+scene.add(new THREE.HemisphereLight('#9aa6e0', '#6b4a4a', 1.5));
+const sun = new THREE.DirectionalLight('#ffc08f', 3.2);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 260 });
+sun.shadow.bias = -0.0006;
+scene.add(sun, sun.target);
+
+scene.add(new THREE.Mesh(
+  new THREE.SphereGeometry(1000, 32, 16),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: { a: { value: COLORS.top }, b: { value: COLORS.mid }, c: { value: COLORS.horizon }, s: { value: SUN } },
+    vertexShader: `varying vec3 d; void main(){ d = normalize(position); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+    fragmentShader: `varying vec3 d; uniform vec3 a,b,c,s;
+      void main(){ vec3 n = normalize(d); float h = max(n.y,0.);
+        vec3 col = mix(c,b,smoothstep(0.,.22,h)); col = mix(col,a,smoothstep(.16,.62,h));
+        float g = max(dot(n,s),0.); col += vec3(1.,.72,.45)*(pow(g,900.)*2.2 + pow(g,18.)*.28);
+        gl_FragColor = vec4(col,1.);
+        #include <colorspace_fragment>
+      }`,
+  })
+));
+
+const seaMat = new THREE.ShaderMaterial({
+  uniforms: { t: { value: 0 }, a: { value: COLORS.sea }, b: { value: COLORS.seaLit }, f: { value: COLORS.horizon }, s: { value: SUN }, cam: { value: new THREE.Vector3() } },
+  vertexShader: `uniform float t; varying vec3 w;
+    void main(){ vec4 p = modelMatrix*vec4(position,1.);
+      p.y += sin(p.x*.16+t*.9)*.3 + sin(p.z*.22-t*1.15)*.24 + sin((p.x+p.z)*.5+t*1.7)*.09;
+      w = p.xyz; gl_Position = projectionMatrix*viewMatrix*p; }`,
+  fragmentShader: `uniform vec3 a,b,f,s,cam; varying vec3 w;
+    void main(){ vec3 n = normalize(cross(dFdx(w),dFdy(w))); if(n.y<0.) n=-n;
+      vec3 v = normalize(cam-w); vec3 r = reflect(-s,n);
+      float gl = pow(max(dot(r,v),0.),36.);
+      vec3 col = mix(a,b,clamp(max(dot(n,s),0.)*.9,0.,1.)*.45) + vec3(1.,.66,.4)*gl*1.5;
+      float dist = length(cam-w); col = mix(col,f,smoothstep(70.,340.,dist));
+      gl_FragColor = vec4(col,1.);
+      #include <colorspace_fragment>
+    }`,
+});
+const sea = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200, 240, 240), seaMat);
+sea.rotation.x = -Math.PI / 2;
+sea.position.y = -1;
+scene.add(sea);
+
+/* ---------- mundo: tudo é cilindro, na física e no desenho ---------- */
+const solids = [];
+const basalt = new THREE.MeshStandardMaterial({ color: '#3d3a4a', flatShading: true, roughness: 1 });
+const stoneTop = new THREE.MeshStandardMaterial({ color: '#a39a93', flatShading: true, roughness: 1 });
+const moss = new THREE.MeshStandardMaterial({ color: '#6c8a58', flatShading: true, roughness: 1 });
+
+function addSolid(x, z, r, top, bottom, opts = {}) {
+  const c = { x, z, r, top, bottom, ...opts };
+  solids.push(c);
+  if (opts.invisible) return c;
+  const m = new THREE.Mesh(
+    new THREE.CylinderGeometry(r, opts.taper ?? r, top - bottom, opts.sides ?? 7),
+    [basalt, opts.topMat ?? stoneTop, basalt],
+  );
+  m.position.set(x, (top + bottom) / 2, z);
+  m.rotation.y = x * 1.7 + z;
+  m.castShadow = m.receiveShadow = true;
+  scene.add(m);
+  return c;
+}
+
+const island = addSolid(0, 0, 26, 0, -9, { topMat: moss, sides: 18, taper: 31 });
+
+const R_SPIRAL = 11, A0 = 0.5, STEP_A = 0.62, STEP_H = 1.87;
+const spiralAt = (i) => A0 + i * STEP_A;
+const spiral = [];
+for (let i = 0; i < 16; i++) {
+  const a = spiralAt(i), top = 1.7 + i * STEP_H;
+  spiral.push(addSolid(Math.sin(a) * R_SPIRAL, Math.cos(a) * R_SPIRAL, 2.2, top, top - 2.4, { taper: 0.7, sides: 6 }));
+}
+
+[[33, 0, 3, 0.6], [42, 2, 3, 1.1], [52, -2, 3.2, 0.8],
+ [-33, -4, 3, 0.7], [-42, -10, 3, 1.0], [-55, -16, 3, 1.2]]
+  .forEach(([x, z, r, top]) => addSolid(x, z, r, top, -9, { taper: r + 1.4, sides: 7 }));
+
+const a11 = spiralAt(11), topA11 = 1.7 + 11 * STEP_H;
+const farStone = addSolid(Math.sin(a11) * 24, Math.cos(a11) * 24, 2.2, topA11, topA11 - 2.4, { taper: 0.7, sides: 6 });
+
+/* farol */
+const towerTop = 30;
+const tower = addSolid(0, 0, 3.6, towerTop, -1, { invisible: true });
+const gallery = addSolid(0, 0, 6, towerTop, towerTop - 0.6, { sides: 16 });
+const lanternSolid = addSolid(0, 0, 2.6, towerTop + 5, towerTop, { invisible: true });
+
+const lighthouse = new THREE.Group();
+const white = new THREE.MeshStandardMaterial({ color: '#efe7da', flatShading: true });
+const red = new THREE.MeshStandardMaterial({ color: '#b5413a', flatShading: true });
+const BANDS = 6, bandH = towerTop / BANDS;
+for (let i = 0; i < BANDS; i++) {
+  const r0 = 4.1 - (i / BANDS) * 1, r1 = 4.1 - ((i + 1) / BANDS) * 1;
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, bandH, 16), i % 2 ? white : red);
+  m.position.y = bandH * (i + 0.5);
+  m.castShadow = m.receiveShadow = true;
+  lighthouse.add(m);
+}
+const lampOff = new THREE.Color('#584a48'), lampOn = new THREE.Color('#fff0b0');
+const glass = new THREE.MeshStandardMaterial({ color: '#d9d4c0', emissive: lampOff.clone(), emissiveIntensity: 1, flatShading: true });
+const lantern = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.3, 3.8, 10), glass);
+lantern.position.y = towerTop + 1.9;
+const roof = new THREE.Mesh(new THREE.ConeGeometry(2.9, 2.2, 10), red);
+roof.position.y = towerTop + 4.9;
+lantern.castShadow = roof.castShadow = true;
+lighthouse.add(lantern, roof);
+scene.add(lighthouse);
+
+/* Modelo do Tripo3D: coloque em assets/farol.glb e ele substitui o farol desenhado por código. */
+new GLTFLoader().load('assets/farol.glb', (gltf) => {
+  const model = gltf.scene;
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  // A sacada do modelo fica a 72% da altura: a escala coloca ela na altura do piso da colisão.
+  const BALCONY_AT = 0.72, LAMP_AT = 0.825;
+  const totalH = towerTop / BALCONY_AT;
+  model.scale.setScalar(totalH / size.y);
+  const fit = new THREE.Box3().setFromObject(model);
+  const center = fit.getCenter(new THREE.Vector3());
+  model.position.set(-center.x, -fit.min.y, -center.z);
+  model.traverse((o) => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
+  lighthouse.visible = false;
+  scene.add(model);
+  // O modelo é mais largo que o farol desenhado por código, então a colisão acompanha.
+  tower.r = 5.9;
+  lanternSolid.r = 4.4;
+  lanternSolid.top = totalH;
+  beam.position.y = glow.position.y = totalH * LAMP_AT;
+  window.__farol.model = { totalH, width: size.x * totalH / size.y };
+}, undefined, () => {});
+
+const beam = new THREE.Mesh(
+  new THREE.ConeGeometry(16, 150, 20, 1, true),
+  new THREE.MeshBasicMaterial({ color: '#fff0b0', transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }),
+);
+beam.geometry.translate(0, -75, 0);
+beam.geometry.rotateX(Math.PI / 2);
+beam.position.y = towerTop + 1.9;
+beam.visible = false;
+scene.add(beam);
+
+const glow = new THREE.Mesh(
+  new THREE.SphereGeometry(2.2, 16, 12),
+  new THREE.MeshBasicMaterial({ color: '#fff0b0', transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }),
+);
+glow.position.y = towerTop + 1.9;
+glow.visible = false;
+scene.add(glow);
+
+/* ---------- cartas ---------- */
+const LETTERS = [
+  { from: 'Vapor Aurora', text: 'Perdemos o rumo na neblina. Alguém ainda cuida do farol?', at: [-7, 1.3, 10] },
+  { from: 'Pesqueiro Maré Alta', text: 'Três pessoas a bordo e o rádio falhando. Acenda quando puder.', at: [52, 2.1, -2] },
+  { from: 'Escuna Santa Inês', text: 'O porto sumiu do mapa. Só confiamos na sua luz.', at: [-55, 2.5, -16] },
+  { from: 'Barca de Correio 12', text: 'Trazemos cartas para a sua ilha. Faz anos que ninguém responde.', at: [spiral[7].x, spiral[7].top + 1.3, spiral[7].z] },
+  { from: 'Veleiro Sem Nome', text: 'Não diga a ninguém que passamos por aqui. Mas acenda.', at: [farStone.x, farStone.top + 1.3, farStone.z] },
+];
+const envGeo = new THREE.BoxGeometry(0.95, 0.62, 0.05);
+const envMat = new THREE.MeshStandardMaterial({ color: '#fff5df', emissive: '#f2a065', emissiveIntensity: 0.7 });
+const rayGeo = new THREE.CylinderGeometry(0.1, 0.1, 90, 6);
+const rayMat = new THREE.MeshBasicMaterial({ color: '#ffd9a6', transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+LETTERS.forEach((l, i) => {
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(envGeo, envMat));
+  g.position.set(...l.at);
+  const ray = new THREE.Mesh(rayGeo, rayMat);
+  ray.position.set(l.at[0], l.at[1] + 45, l.at[2]);
+  scene.add(g, ray);
+  l.mesh = g; l.ray = ray; l.got = false; l.phase = i * 1.4;
+});
+
+/* ---------- partículas e sombra de pouso ---------- */
+const N_P = 160;
+const pPos = new Float32Array(N_P * 3).fill(-999);
+const pVel = Array.from({ length: N_P }, () => ({ x: 0, y: 0, z: 0, life: 0, g: 0 }));
+const pGeo = new THREE.BufferGeometry();
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+const points = new THREE.Points(pGeo, new THREE.PointsMaterial({ color: '#f6ead7', size: 0.08, transparent: true, opacity: 0.85, depthWrite: false }));
+points.frustumCulled = false;
+scene.add(points);
+let pNext = 0;
+function burst(x, y, z, n, speed, up, g = 16) {
+  for (let i = 0; i < n; i++) {
+    const k = pNext = (pNext + 1) % N_P, a = Math.random() * 6.283, s = speed * (0.4 + Math.random() * 0.6);
+    pPos[k * 3] = x; pPos[k * 3 + 1] = y; pPos[k * 3 + 2] = z;
+    Object.assign(pVel[k], { x: Math.cos(a) * s, z: Math.sin(a) * s, y: up * Math.random(), life: 0.35 + Math.random() * 0.4, g });
+  }
+}
+function stepParticles(dt) {
+  for (let i = 0; i < N_P; i++) {
+    const v = pVel[i];
+    if (v.life <= 0) continue;
+    v.life -= dt; v.y -= v.g * dt;
+    pPos[i * 3] += v.x * dt; pPos[i * 3 + 1] += v.y * dt; pPos[i * 3 + 2] += v.z * dt;
+    if (v.life <= 0) pPos[i * 3 + 1] = -999;
+  }
+  pGeo.attributes.position.needsUpdate = true;
+}
+const blob = new THREE.Mesh(new THREE.CircleGeometry(0.55, 20), new THREE.MeshBasicMaterial({ color: '#10101c', transparent: true, opacity: 0.5, depthWrite: false }));
+blob.rotation.x = -Math.PI / 2;
+blob.visible = false;
+scene.add(blob);
+
+/* ---------- som: tudo sintetizado, começa no primeiro clique ---------- */
+let ac, windGain, windFilter, noiseBuf;
+function initAudio() {
+  if (ac) { ac.resume(); return; }
+  try {
+    ac = new (window.AudioContext || window.webkitAudioContext)();
+    noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const src = ac.createBufferSource();
+    src.buffer = noiseBuf; src.loop = true;
+    windFilter = ac.createBiquadFilter(); windFilter.type = 'bandpass'; windFilter.frequency.value = 400; windFilter.Q.value = 0.6;
+    windGain = ac.createGain(); windGain.gain.value = 0.02;
+    src.connect(windFilter).connect(windGain).connect(ac.destination);
+    src.start();
+  } catch { ac = null; }
+}
+function noise(dur, freq, vol, type = 'lowpass') {
+  if (!ac) return;
+  const s = ac.createBufferSource(); s.buffer = noiseBuf;
+  const f = ac.createBiquadFilter(); f.type = type; f.frequency.value = freq;
+  const g = ac.createGain(), t = ac.currentTime;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  s.connect(f).connect(g).connect(ac.destination);
+  s.start(t, Math.random()); s.stop(t + dur);
+}
+function tone(freq, dur, vol, delay = 0, type = 'triangle') {
+  if (!ac) return;
+  const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime + delay;
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+  o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur);
+}
+const sfx = {
+  step: () => noise(0.07, 420, 0.1),
+  jump: () => { tone(220, 0.12, 0.05); noise(0.09, 900, 0.07); },
+  land: (k) => { noise(0.13, 260, 0.14 + k * 0.3); tone(70, 0.13, 0.12 + k * 0.25, 0, 'sine'); },
+  dash: () => noise(0.24, 1500, 0.2, 'bandpass'),
+  letter: () => [659, 880, 1175].forEach((f, i) => tone(f, 0.4, 0.09, i * 0.075)),
+  splash: () => noise(0.55, 900, 0.35),
+  win: () => [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, 1.1, 0.1, i * 0.14)),
+};
+
+/* ---------- jogador ---------- */
+const SPAWN = { x: 0, y: 0, z: 20 };
+const P = {
+  x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, grounded: false, ground: null,
+  coyote: 0, buffer: 0, dashT: 0, dashCd: 0, airDash: true, dx: 0, dz: 0,
+  yaw: 0, pitch: 0, roll: 0, fov: 80, dip: 0, bob: 0, stepN: 0, strafe: 0,
+  safe: { ...SPAWN },
+};
+const keys = {};
+let state = 'menu', elapsed = 0, collected = 0, hintCd = 0, noLock = false;
+
+const $ = (id) => document.getElementById(id);
+function fmt(t) { const m = Math.floor(t / 60), s = t - m * 60; return `${m}:${s < 10 ? '0' : ''}${s.toFixed(1)}`; }
+let letterTimer = 0;
+function showNote(from, text, dur = 4.5) {
+  $('carta').children[0].textContent = from;
+  $('carta').children[1].textContent = text;
+  $('carta').classList.add('on');
+  letterTimer = dur;
+}
+function flash(o) {
+  $('flash').style.transition = 'none'; $('flash').style.opacity = o;
+  requestAnimationFrame(() => { $('flash').style.transition = 'opacity .5s'; $('flash').style.opacity = 0; });
+}
+
+function reset() {
+  Object.assign(P, { x: SPAWN.x, y: SPAWN.y, z: SPAWN.z, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, grounded: true, ground: island, dashT: 0, dashCd: 0, airDash: true, safe: { ...SPAWN } });
+  elapsed = 0; collected = 0; beam.visible = glow.visible = false;
+  glass.emissive.copy(lampOff);
+  LETTERS.forEach((l) => { l.got = false; l.mesh.visible = l.ray.visible = true; });
+  $('contagem').textContent = 'Cartas 0/5';
+  $('carta').classList.remove('on');
+  story.gen++; story.history = []; story.next = null; story.atual = null;
+  story.chamando = false; story.navioAtual = null; story.guiados = 0;
+  hideRadio();
+  limparNavios();
+  hudRadio(false, 'Canal 16 · em silêncio');
+}
+
+function respawn() {
+  burst(P.x, -0.8, P.z, 50, 7, 11); sfx.splash(); flash(0.65);
+  Object.assign(P, { x: P.safe.x, y: P.safe.y, z: P.safe.z, vx: 0, vy: 0, vz: 0, dashT: 0, airDash: true });
+}
+
+function sim(dt) {
+  const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw), rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw);
+  const f = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0), s = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
+  let wx = fx * f + rx * s, wz = fz * f + rz * s;
+  const wl = Math.hypot(wx, wz);
+  if (wl > 0) { wx /= wl; wz /= wl; }
+  P.strafe = s;
+
+  P.coyote = P.grounded ? MOVE.coyote : Math.max(0, P.coyote - dt);
+  P.buffer = Math.max(0, P.buffer - dt);
+  P.dashCd = Math.max(0, P.dashCd - dt);
+  if (P.grounded) P.airDash = true;
+
+  if (keys.dashPressed && P.dashCd <= 0 && P.airDash && P.dashT <= 0) {
+    P.dx = wl > 0 ? wx : fx; P.dz = wl > 0 ? wz : fz;
+    P.dashT = MOVE.dashTime; P.dashCd = MOVE.dashCooldown;
+    if (!P.grounded) P.airDash = false;
+    sfx.dash();
+    burst(P.x, P.y + 0.3, P.z, 12, 3, 2, 4);
+  }
+  keys.dashPressed = false;
+
+  // Pular durante o dash no chão interrompe o dash e mantém o embalo.
+  if (P.dashT > 0 && P.buffer > 0 && P.coyote > 0) {
+    const k = MOVE.keepAfterDash / MOVE.dashSpeed;
+    P.vx *= k; P.vz *= k; P.dashT = 0;
+  }
+
+  const speed = Math.hypot(P.vx, P.vz);
+  if (P.dashT > 0) {
+    P.vx = P.dx * MOVE.dashSpeed; P.vz = P.dz * MOVE.dashSpeed; P.vy = 0;
+    P.dashT -= dt;
+    if (P.dashT <= 0) {
+      const k = MOVE.keepAfterDash / MOVE.dashSpeed;
+      P.vx *= k; P.vz *= k;
+    }
+  } else {
+    if (P.grounded) {
+      if (wl > 0) {
+        const cap = MOVE.run;
+        const tx = wx * cap - P.vx, tz = wz * cap - P.vz, tl = Math.hypot(tx, tz), a = MOVE.groundAccel * dt;
+        if (tl <= a) { P.vx = wx * cap; P.vz = wz * cap; } else { P.vx += tx / tl * a; P.vz += tz / tl * a; }
+      } else if (speed > 0) {
+        const n = Math.max(0, speed - MOVE.groundFriction * dt) / speed;
+        P.vx *= n; P.vz *= n;
+      }
+    } else if (wl > 0) {
+      const cap = Math.max(MOVE.run, speed);
+      const tx = wx * cap - P.vx, tz = wz * cap - P.vz, tl = Math.hypot(tx, tz), a = MOVE.airAccel * dt;
+      if (tl <= a) { P.vx = wx * cap; P.vz = wz * cap; } else { P.vx += tx / tl * a; P.vz += tz / tl * a; }
+    }
+    if (P.buffer > 0 && P.coyote > 0) {
+      P.vy = MOVE.jump; P.grounded = false; P.coyote = 0; P.buffer = 0;
+      sfx.jump();
+    }
+    const g = (P.vy > 0 && keys.Space) ? MOVE.gravity : MOVE.gravity * MOVE.fallMult;
+    P.vy = Math.max(P.vy - g * dt, -MOVE.maxFall);
+  }
+
+  const prevY = P.y, wasGrounded = P.grounded, impact = -P.vy;
+  P.x += P.vx * dt; P.y += P.vy * dt; P.z += P.vz * dt;
+
+  P.grounded = false; P.ground = null;
+  const r = MOVE.radius, H = MOVE.height;
+  for (const c of solids) {
+    let dx = P.x - c.x, dz = P.z - c.z, d = Math.hypot(dx, dz);
+    if (d >= c.r + r) continue;
+    const feet = P.y, head = P.y + H, tol = MOVE.stepTolerance;
+    if (feet <= c.top + 0.001 && feet >= c.top - tol && P.vy <= 0 && d < c.r + r * 0.6) {
+      P.y = c.top; P.vy = 0; P.grounded = true; P.ground = c;
+      continue;
+    }
+    if (feet < c.top - tol && head > c.bottom) {
+      if (prevY + H <= c.bottom + 0.02 && P.vy > 0) { P.y = c.bottom - H; P.vy = 0; continue; }
+      if (d < 1e-4) { dx = 1; dz = 0; d = 1; }
+      const nx = dx / d, nz = dz / d;
+      P.x = c.x + nx * (c.r + r); P.z = c.z + nz * (c.r + r);
+      const vn = P.vx * nx + P.vz * nz;
+      if (vn < 0) { P.vx -= nx * vn; P.vz -= nz * vn; }
+    }
+  }
+
+  if (P.grounded && !wasGrounded) {
+    const k = Math.min(impact / MOVE.maxFall, 1);
+    if (!calm) P.dip = Math.min(P.dip + 0.05 + k * 0.42, 0.42);
+    sfx.land(k);
+    if (impact > 7) burst(P.x, P.y + 0.05, P.z, 8 + Math.round(k * 26), 3 + k * 6, 2 + k * 3);
+  }
+  if (P.grounded && P.ground) {
+    if (P.ground === island) { P.safe = { x: P.x * 0.92, y: 0, z: P.z * 0.92 }; }
+    else { P.safe = { x: P.ground.x, y: P.ground.top, z: P.ground.z }; }
+  }
+  if (P.y < -1.3) respawn();
+
+  const groundSpeed = P.grounded ? Math.hypot(P.vx, P.vz) : 0;
+  P.bob += groundSpeed * dt * 1.25;
+  const n = Math.floor(P.bob / Math.PI);
+  if (n !== P.stepN) { P.stepN = n; if (groundSpeed > 1) sfx.step(); }
+  P.dip *= Math.exp(-dt * 9);
+
+  for (const l of LETTERS) {
+    if (l.got) continue;
+    if (Math.hypot(P.x - l.mesh.position.x, P.y + 0.9 - l.mesh.position.y, P.z - l.mesh.position.z) < 1.7) {
+      if (story.chamando) {
+        if (hintCd <= 0) { showNote('Rádio', 'Responda a chamada antes de pegar outra carta.', 2.5); hintCd = 3; }
+        continue;
+      }
+      l.got = true; l.mesh.visible = l.ray.visible = false;
+      collected++;
+      P.airDash = true; P.dashCd = 0;
+      $('contagem').textContent = `Cartas ${collected}/5`;
+      burst(l.mesh.position.x, l.mesh.position.y, l.mesh.position.z, 30, 5, 5, 6);
+      sfx.letter();
+      P.fov += 6;
+      openRadio(l);
+      return;
+    }
+  }
+
+  hintCd = Math.max(0, hintCd - dt);
+  if (P.grounded && (P.ground === gallery || P.ground === tower) && state === 'play') {
+    if (collected === LETTERS.length && !story.chamando) win();
+    else if (hintCd <= 0) { showNote('Farol', story.chamando ? 'Responda o rádio antes de acender a lâmpada.' : `A lâmpada não acende: ${LETTERS.length - collected} carta(s) ainda no mar.`, 3); hintCd = 5; }
+  }
+}
+
+function win() {
+  state = 'epilogue';
+  glass.emissive.copy(lampOn); glass.emissiveIntensity = 2.4;
+  beam.visible = glow.visible = true;
+  glow.material.opacity = 0.75;
+  sfx.win(); flash(0.5);
+  releaseKeys();
+  const gen = story.gen, tempo = fmt(elapsed);
+  showRadio({ centro: true, tag: 'Amanhecer', nome: 'Farol aceso', texto: 'O rádio está contando o que aconteceu com cada navio…', escolhas: [] });
+  post('/api/game/epilogue', { history: story.history }).catch(() => null).then((d) => {
+    if (gen !== story.gen) return;
+    const texto = (d && d.text) || `Ao amanhecer, a luz alcançou o mar. ${story.history.map((h) => `${h.name} ouviu: "${h.choice}"`).join(' ')} O faroleiro nunca soube quantos chegaram ao porto.`;
+    showRadio({ centro: true, tag: `Epílogo · ${tempo}`, nome: 'Farol aceso', texto, escolhas: ['Fechar e olhar o mar'] });
+  });
+}
+
+/* ---------- narrativa: as mensagens vêm da IA do Rádio do Farol, criado no Emergent ---------- */
+const API = 'https://navios-no-farol--8gq73n0m.preview.emergentagent.com';
+const RESPOSTAS_GRAVADAS = ['A luz vai acender. Venham devagar.', 'Fiquem longe das pedras até o amanhecer.'];
+const story = { history: [], gen: 0, next: null, atual: null, chamando: false, prazo: 0, prazoTotal: 1, digitando: null, navioAtual: null };
+const SEM_RESPOSTA = 'O faroleiro não respondeu.';
+// Lê a resposta escolhida pela IA e decide o que o navio faz no mar.
+const AFASTA = /recu|longe|afast|saia|sair|ocult|fiqu|dist[aâ]ncia|aguard|espere|[aâ]ncora|ancor|pare\b/i;
+const DESTINOS = { veio: 'veio ao porto', longe: 'manteve distância', nada: 'sem resposta' };
+
+sfx.radio = () => { noise(0.3, 1800, 0.12, 'bandpass'); tone(880, 0.1, 0.09, 0.05, 'square'); tone(880, 0.1, 0.09, 0.22, 'square'); };
+
+/* Navios: aparecem no mar quando chamam e obedecem à resposta do jogador. */
+const naviosNoMar = [];
+const cascoMat = new THREE.MeshStandardMaterial({ color: '#5b3a2c', flatShading: true });
+const velaMat = new THREE.MeshStandardMaterial({ color: '#e9dfc9', flatShading: true });
+function etiqueta(nome) {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 96;
+  const g = c.getContext('2d');
+  g.fillStyle = '#0f141ecc'; g.fillRect(0, 0, 512, 96);
+  g.fillStyle = '#ffe2b0'; g.font = '44px "Courier New", monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(nome.length > 20 ? `${nome.slice(0, 19)}…` : nome, 256, 50);
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, fog: false, depthWrite: false }));
+  s.scale.set(16, 3, 1);
+  s.position.y = 12;
+  return s;
+}
+function criarNavio(nome) {
+  const n = naviosNoMar.length;
+  const ang = 0.9 + n * 1.26, raio = 78;
+  const g = new THREE.Group();
+  const casco = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.8, 9), cascoMat);
+  casco.position.y = 0.8;
+  const cabine = new THREE.Mesh(new THREE.BoxGeometry(2, 1.6, 2.6), velaMat);
+  cabine.position.set(0, 2.5, 1.6);
+  const vela = new THREE.Mesh(new THREE.ConeGeometry(2.3, 7.5, 4), velaMat);
+  vela.position.set(0, 6, -1.4);
+  const luz = new THREE.Mesh(new THREE.SphereGeometry(0.9, 10, 8), new THREE.MeshBasicMaterial({ color: '#ffc978', fog: false }));
+  luz.position.y = 10;
+  // O balanço fica num grupo interno: mexer na rotação do grupo que usa lookAt vira o navio de ponta-cabeça.
+  const corpo = new THREE.Group();
+  corpo.add(casco, cabine, vela, luz, etiqueta(nome));
+  corpo.scale.setScalar(1.6);
+  g.add(corpo);
+  g.position.set(Math.sin(ang) * raio, -0.7, Math.cos(ang) * raio);
+  g.lookAt(0, -0.7, 0);
+  scene.add(g);
+  const navio = { g, corpo, luz, ang, destino: null, fase: n * 1.7 };
+  naviosNoMar.push(navio);
+  return navio;
+}
+function mandarNavio(navio, destino) {
+  if (!navio) return;
+  navio.destino = destino;
+  navio.luz.material.color.set(destino === 'veio' ? '#6dff8a' : destino === 'longe' ? '#ff9a3c' : '#ff4a3c');
+  const r = destino === 'veio' ? 36 : 210;
+  navio.alvoX = Math.sin(navio.ang) * r; navio.alvoZ = Math.cos(navio.ang) * r;
+  if (destino === 'longe') navio.g.lookAt(navio.alvoX * 2, navio.g.position.y, navio.alvoZ * 2);
+}
+function moverNavios(dt, t) {
+  for (const n of naviosNoMar) {
+    const p = n.g.position;
+    n.corpo.rotation.z = Math.sin(t * 0.9 + n.fase) * 0.05;
+    if (n.destino === 'nada') { p.y -= dt * 0.55; n.corpo.rotation.x += dt * 0.05; continue; }
+    p.y = -0.7 + Math.sin(t * 0.8 + n.fase) * 0.18;
+    if (!n.destino) continue;
+    const dx = n.alvoX - p.x, dz = n.alvoZ - p.z, d = Math.hypot(dx, dz);
+    if (d > 0.5) { const v = Math.min(14 * dt, d); p.x += dx / d * v; p.z += dz / d * v; }
+  }
+}
+function limparNavios() {
+  naviosNoMar.forEach((n) => scene.remove(n.g));
+  naviosNoMar.length = 0;
+  $('diario').replaceChildren();
+}
+function hudRadio(ativa, texto) {
+  $('radioHud').classList.toggle('ativa', ativa);
+  $('radioHudTexto').textContent = texto;
+}
+
+function post(path, body, ms = 30000) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), ms);
+  return fetch(API + path, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctl.signal,
+  }).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }).finally(() => clearTimeout(t));
+}
+// Pede o próximo navio assim que o jogador responde, para a carta abrir sem espera.
+function prefetch() {
+  story.next = { p: post('/api/game/ship', { history: story.history.slice() }).catch(() => null) };
+}
+function releaseKeys() { Object.keys(keys).forEach((k) => { keys[k] = false; }); }
+function showRadio({ centro = false, tag, nome, tom = '', texto, escolhas, digitar = false }) {
+  $('radio').classList.toggle('centro', centro);
+  $('radioTag').textContent = tag;
+  $('radioNome').textContent = nome;
+  $('radioTom').textContent = tom;
+  $('radioTexto').textContent = digitar ? '' : texto;
+  story.digitando = digitar ? { texto, i: 0 } : null;
+  $('radioTempo').hidden = true;
+  const box = $('radioEscolhas');
+  box.replaceChildren(...escolhas.map((c, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    const k = document.createElement('kbd');
+    k.textContent = i + 1;
+    const span = document.createElement('span');
+    span.textContent = c;
+    b.append(k, span);
+    b.addEventListener('click', () => choose(i));
+    return b;
+  }));
+  $('radio').hidden = false;
+  $('radio').scrollTop = 0;
+}
+function hideRadio() { $('radio').hidden = true; story.digitando = null; }
+
+async function openRadio(l) {
+  const gen = story.gen;
+  story.chamando = true;
+  sfx.radio();
+  hudRadio(true, 'Canal 16 · sintonizando');
+  showRadio({ tag: 'Chamada recebida', nome: 'Navio não identificado', texto: 'Estática no canal 16…', escolhas: [] });
+  const ship = story.next ? await story.next.p : null;
+  if (gen !== story.gen) return;
+  const ok = ship && ship.name && ship.message && Array.isArray(ship.choices) && ship.choices.length >= 2;
+  story.atual = ok ? ship : { name: l.from, tone: 'mensagem gravada', problem: 'sinal fraco', message: l.text, choices: RESPOSTAS_GRAVADAS };
+  story.navioAtual = criarNavio(story.atual.name);
+  sfx.radio();
+  hudRadio(true, `Canal 16 · ${story.atual.name}`);
+  showRadio({
+    tag: ok ? 'Ao vivo · responda' : 'Sinal fraco · mensagem gravada',
+    nome: story.atual.name, tom: story.atual.tone, texto: story.atual.message, escolhas: story.atual.choices.slice(0, 2), digitar: true,
+  });
+  // Tempo para ler e responder. Se acabar, o silêncio também entra na história.
+  story.prazoTotal = story.prazo = 18 + story.atual.message.length / 22;
+  $('radioTempo').hidden = false;
+}
+
+function registrarDestino(nome, destino) {
+  const linha = document.createElement('div');
+  linha.className = destino;
+  linha.textContent = `${nome}: ${DESTINOS[destino]}`;
+  $('diario').append(linha);
+}
+
+function choose(i) {
+  if (state === 'epilogue') {
+    if (!$('radioEscolhas').children.length) return;
+    hideRadio();
+    state = 'won';
+    showNote('Farol aceso', 'Aperte R para jogar de novo.', 9999);
+    return;
+  }
+  if (state !== 'play' || !story.atual) return;
+  const s = story.atual;
+  const semResposta = i < 0;
+  if (!semResposta && !s.choices[i]) return;
+  const escolha = semResposta ? SEM_RESPOSTA : s.choices[i];
+  story.history.push({ name: s.name, tone: s.tone || '', problem: s.problem || '', message: s.message, choice: escolha });
+  const destino = semResposta ? 'nada' : AFASTA.test(escolha) ? 'longe' : 'veio';
+  mandarNavio(story.navioAtual, destino);
+  registrarDestino(s.name, destino);
+  // Cada navio guiado até o porto deixa a lâmpada mais forte.
+  if (destino === 'veio') {
+    story.guiados = (story.guiados || 0) + 1;
+    glow.visible = true;
+    glow.material.opacity = 0.14 + story.guiados * 0.11;
+    glass.emissive.lerp(lampOn, 0.3);
+  }
+  tone(destino === 'nada' ? 196 : destino === 'longe' ? 330 : 659, 0.3, 0.1);
+  story.atual = null; story.navioAtual = null; story.chamando = false;
+  hideRadio();
+  hudRadio(false, 'Canal 16 · em silêncio');
+  if (story.history.length < LETTERS.length) prefetch();
+}
+
+// Texto chegando pelo rádio e relógio da chamada; o jogo não para enquanto isso.
+function tickRadio(dt) {
+  if (story.digitando) {
+    const d = story.digitando;
+    d.i = Math.min(d.texto.length, d.i + 75 * dt);
+    $('radioTexto').textContent = d.texto.slice(0, Math.floor(d.i));
+    if (d.i >= d.texto.length) story.digitando = null;
+  }
+  if (state === 'play' && story.atual) {
+    story.prazo -= dt;
+    $('radioTempo').firstElementChild.style.width = `${Math.max(0, story.prazo / story.prazoTotal) * 100}%`;
+    if (story.prazo <= 0) choose(-1);
+  }
+}
+
+function applyCamera(dt) {
+  const hs = Math.hypot(P.vx, P.vz);
+  const k = THREE.MathUtils.clamp((hs - MOVE.run) / (MOVE.dashSpeed - MOVE.run), 0, 1);
+  const targetFov = 80 + (calm ? 0 : k * 18 + (P.dashT > 0 ? 6 : 0));
+  P.fov += (targetFov - P.fov) * Math.min(1, dt * 10);
+  camera.fov = P.fov; camera.updateProjectionMatrix();
+
+  const targetRoll = calm ? 0 : -P.strafe * 0.028 * Math.min(hs / MOVE.run, 1);
+  P.roll += (targetRoll - P.roll) * Math.min(1, dt * 10);
+
+  const moveK = Math.min(Math.hypot(P.vx, P.vz) / MOVE.run, 1) * (P.grounded && !calm ? 1 : 0);
+  const bobY = Math.sin(P.bob * 2) * 0.05 * moveK, bobX = Math.cos(P.bob) * 0.035 * moveK;
+  camera.position.set(
+    P.x + Math.cos(P.yaw) * bobX,
+    P.y + MOVE.eye - P.dip + bobY,
+    P.z - Math.sin(P.yaw) * bobX,
+  );
+  camera.rotation.set(P.pitch, P.yaw, P.roll);
+
+  let best = null;
+  for (const c of solids) {
+    if (Math.hypot(P.x - c.x, P.z - c.z) < c.r && c.top <= P.y + 0.05 && (!best || c.top > best.top)) best = c;
+  }
+  blob.visible = !!best && !P.grounded;
+  if (best) {
+    blob.position.set(P.x, best.top + 0.02, P.z);
+    blob.material.opacity = THREE.MathUtils.clamp(0.6 - (P.y - best.top) * 0.03, 0.15, 0.6);
+  }
+
+  sun.position.set(P.x + SUN.x * 130, P.y + SUN.y * 130, P.z + SUN.z * 130);
+  sun.target.position.set(P.x, P.y, P.z);
+  seaMat.uniforms.cam.value.copy(camera.position);
+
+  if (ac && windGain) {
+    const t = ac.currentTime, airy = Math.min(Math.hypot(hs, P.vy) / 30, 1);
+    windGain.gain.setTargetAtTime(0.012 + airy * airy * 0.2, t, 0.1);
+    windFilter.frequency.setTargetAtTime(320 + airy * 1500, t, 0.1);
+  }
+}
+
+function animate(dt, t) {
+  seaMat.uniforms.t.value = t;
+  LETTERS.forEach((l) => {
+    if (l.got) return;
+    l.mesh.rotation.y = t * 1.5 + l.phase;
+    l.mesh.position.y = l.at[1] + Math.sin(t * 2 + l.phase) * 0.14;
+  });
+  if (beam.visible) beam.rotation.y = t * 0.7;
+  moverNavios(dt, t);
+  tickRadio(dt);
+  stepParticles(dt);
+  $('dash').firstElementChild.style.width = `${(P.airDash || P.grounded ? 1 - P.dashCd / MOVE.dashCooldown : 0) * 100}%`;
+  $('tempo').textContent = fmt(elapsed);
+  if (letterTimer > 0) { letterTimer -= dt; if (letterTimer <= 0) $('carta').classList.remove('on'); }
+}
+
+/* ---------- laço principal com física fixa em 120 Hz ---------- */
+const FIXED = 1 / 120;
+let last = performance.now(), acc = 0, clock = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min((now - last) / 1000, 0.1);
+  last = now; clock += dt;
+  if (state === 'play' || state === 'won') {
+    acc += dt;
+    while (acc >= FIXED && (state === 'play' || state === 'won')) { sim(FIXED); acc -= FIXED; }
+    if (state === 'play') elapsed += dt;
+    edgeTurn(dt);
+  }
+  applyCamera(dt);
+  animate(dt, clock);
+  renderer.render(scene, camera);
+}
+
+/* ---------- controles ---------- */
+const tela = $('tela');
+function begin() {
+  initAudio();
+  if (state === 'menu') { reset(); prefetch(); }
+  tela.hidden = true;
+  state = elapsed > 0 && collected === LETTERS.length && beam.visible ? 'won' : 'play';
+  const canvas = renderer.domElement;
+  try {
+    const r = canvas.requestPointerLock();
+    if (r && r.catch) r.catch(() => { noLock = true; });
+  } catch { noLock = true; }
+}
+tela.addEventListener('click', begin);
+
+document.addEventListener('pointerlockchange', () => {
+  if (document.pointerLockElement || noLock) return;
+  if (state === 'play' || state === 'won') {
+    Object.keys(keys).forEach((k) => { keys[k] = false; });
+    state = beam.visible ? 'won' : 'pause';
+    if (state === 'pause') {
+      $('titulo').textContent = 'Pausado';
+      $('texto').textContent = `Cartas ${collected}/5. O mar espera.`;
+      $('vai').textContent = 'Clique para continuar';
+      tela.hidden = false;
+    }
+  }
+});
+document.addEventListener('pointerlockerror', () => { noLock = true; });
+
+addEventListener('keydown', (e) => {
+  if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
+  if (e.repeat) return;
+  keys[e.code] = true;
+  if (e.code === 'Space') P.buffer = MOVE.buffer;
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.dashPressed = true;
+  if (e.code === 'KeyR' && ['play', 'won', 'epilogue'].includes(state)) { reset(); prefetch(); state = 'play'; }
+  if (e.code === 'Digit1' || e.code === 'Numpad1') choose(0);
+  if (e.code === 'Digit2' || e.code === 'Numpad2') choose(1);
+});
+addEventListener('keyup', (e) => { keys[e.code] = false; });
+addEventListener('blur', () => { Object.keys(keys).forEach((k) => { keys[k] = false; }); });
+addEventListener('contextmenu', (e) => e.preventDefault());
+addEventListener('mousedown', (e) => {
+  if (state === 'menu' || state === 'pause') return;
+  if (e.button === 2) keys.dashPressed = true;
+  if (!document.pointerLockElement) {
+    try { const r = renderer.domElement.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch {}
+  }
+});
+// A câmera segue o mouse sem clique, com ou sem captura do cursor pelo navegador.
+const mouse = { x: 0, y: 0, inside: false };
+addEventListener('mousemove', (e) => {
+  mouse.x = e.clientX; mouse.y = e.clientY; mouse.inside = true;
+  if (state !== 'play' && state !== 'won') return;
+  P.yaw -= e.movementX * 0.0023;
+  P.pitch = THREE.MathUtils.clamp(P.pitch - e.movementY * 0.0023, -1.5, 1.5);
+});
+document.documentElement.addEventListener('mouseleave', () => { mouse.inside = false; });
+// Sem captura, o cursor bate na borda da janela: encostar nela continua girando.
+function edgeTurn(dt) {
+  if (document.pointerLockElement || !mouse.inside) return;
+  const M = 0.1;
+  const edge = (v) => (v < M ? -(1 - v / M) : v > 1 - M ? 1 - (1 - v) / M : 0);
+  P.yaw -= edge(mouse.x / innerWidth) * 2.6 * dt;
+  P.pitch = THREE.MathUtils.clamp(P.pitch - edge(mouse.y / innerHeight) * 1.5 * dt, -1.5, 1.5);
+}
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+reset();
+P.pitch = 0.05;
+window.__farol = { naviosNoMar, camera, story, P, keys, sim, FIXED, LETTERS, spiral, solids, MOVE, get state() { return state; }, set state(v) { state = v; }, get collected() { return collected; },
+  draw() { applyCamera(1 / 60); animate(1 / 60, clock); renderer.render(scene, camera); } };
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
