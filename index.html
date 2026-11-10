@@ -303,21 +303,23 @@ scene.add(glow);
 
 /* ---------- cartas ---------- */
 const LETTERS = [
-  { from: 'Vapor Aurora', tone: 'capitã exausta, voz firme', at: [-7, 1.3, 10],
-    text: 'Perdemos o rumo na neblina e a bússola enlouqueceu. Temos vinte passageiros a bordo. Alguém ainda cuida do farol?',
-    choices: [{ t: 'Sigam minha voz, eu guio vocês até o cais.', d: 'veio' }, { t: 'Lancem âncora e esperem clarear.', d: 'longe' }] },
-  { from: 'Pesqueiro Maré Alta', tone: 'pescador nervoso, rádio falhando', at: [52, 2.1, -2],
-    text: 'Três pessoas a bordo, água entrando no porão e o rádio morrendo. Se eu forçar o motor até a ilha, pode ser o fim dele. O que eu faço?',
-    choices: [{ t: 'Force o motor e venha pelo canal leste.', d: 'veio' }, { t: 'Poupe o barco e fique longe das pedras.', d: 'longe' }] },
-  { from: 'Escuna Santa Inês', tone: 'contramestre desconfiado', at: [-55, 2.5, -16],
-    text: 'O porto sumiu do mapa e a tripulação só fala em voltar. Eu confio na sua luz, mas ela está apagada. Por que deveria seguir você?',
-    choices: [{ t: 'Porque vou acender esta noite. Venham.', d: 'veio' }, { t: 'Não sigam. Voltem para alto-mar.', d: 'longe' }] },
-  { from: 'Barca de Correio 12', tone: 'carteira bem-humorada', at: [spiral[7].x, spiral[7].top + 1.3, spiral[7].z],
-    text: 'Trago cartas para a sua ilha. Faz anos que ninguém responde, e eu já estava desistindo da rota. Ainda tem alguém aí para receber?',
-    choices: [{ t: 'Tem sim. Pode atracar, estou esperando.', d: 'veio' }, { t: 'Deixe as cartas na boia e siga viagem.', d: 'longe' }] },
-  { from: 'Veleiro Sem Nome', tone: 'voz baixa, com pressa', at: [farStone.x, farStone.top + 1.3, farStone.z],
-    text: 'Não diga a ninguém que passamos por aqui. Levamos gente que precisa desaparecer. Só preciso saber se o canal está livre.',
-    choices: [{ t: 'Canal livre. Passem junto da ilha.', d: 'veio' }, { t: 'Não quero saber. Fiquem longe daqui.', d: 'longe' }] },
+  // Nomes, tons, mensagens e respostas gerados pela IA do Rádio do Farol (Emergent), sem edição.
+  // Só o destino de cada resposta (veio ao porto ou ficou longe) foi definido à mão.
+  { from: 'Jangada Motorizada Pingo de Sal', tone: 'cansado, desconfiado e ligeiramente irônico', at: [-7, 1.3, 10],
+    text: 'Aqui fala a Jangada Motorizada Pingo de Sal, e eu juro que nunca pensei em chamar um farol apagado. Estou vindo rente à costa com motor falhando e um passageiro clandestino escondido debaixo da lona da carga. Ele não para quieto, e eu não sei se foge da polícia, de alguém pior, ou de mim. Vi sua torre escura antes de entrar na faixa rasa. Se o senhor estiver vendo isso, mande uma luz, um rumo, qualquer sinal. Estou quase cego aqui.',
+    choices: [{ t: 'Denuncie a jangada à patrulha e mantenha silêncio.', d: 'longe' }, { t: 'Mostre uma rota segura e deixe o clandestino seguir viagem.', d: 'veio' }] },
+  { from: 'Correio de Sargaço', tone: 'preocupado, seco e metódico, com pressa contida', at: [52, 2.1, -2],
+    text: 'Aqui é o Correio de Sargaço, falando pelo rádio com o farol da ponta. Estou parado a meio cabo da ilha; o motor tossiu, deu um estalo e morreu de vez. Trago sacolas de carta, remédio e dois caixotes de encomenda, tudo começando a encharcar. O estranho é eu não ver sua luz. Farol apagado? Isso não me agrada nem um pouco. Preciso de confirmação da sua posição e, se puder, uma orientação de rumo antes que a corrente me empurre para as pedras.',
+    choices: [{ t: 'Acenda a lanterna de emergência e guie-o até a enseada.', d: 'veio' }, { t: 'Minta que está tudo certo e mande-o seguir no escuro.', d: 'longe' }] },
+  { from: 'Rebocador Pêndulo de Sal', tone: 'áspero, nervoso e supersticioso', at: [-55, 2.5, -16],
+    text: 'Aqui é o Rebocador Pêndulo de Sal, escuta bem: minha bússola resolveu girar como peixe preso em anzol, e eu já não sei se a proa aponta pro norte ou pro fundo. Tô arrastando um casco sem carga, com dois homens quietos demais e uma correnteza que parece me puxar de lado. Mas o que me espantou mesmo foi teu farol: tá apagado? Isso não se faz com quem navega no escuro. Me dá um rumo, por Deus, antes que eu beije as pedras.',
+    choices: [{ t: 'Acenda o farol e marque a rota segura no rádio.', d: 'veio' }, { t: 'Minta um rumo para afastá-lo das pedras, mesmo sem ver bem.', d: 'longe' }] },
+  { from: 'Iate Véspera de Sal', tone: 'calmo, elegante e levemente ansioso', at: [spiral[7].x, spiral[7].top + 1.3, spiral[7].z],
+    text: 'Aqui é o iate Véspera de Sal, falando pelo canal de emergência. Estou com um tripulante febril e pálido, respirando curto desde a última guinada. Preciso de orientação para entrar em água calma e abrigo rápido, mas o seu farol está apagado. Isso não combina com esta costa, nem com o que me disseram no mapa. Se estiver me ouvindo, responda com o rumo mais seguro e diga se há porto aberto por perto. Não quero arriscar a vida dele nem rasgar o casco na escuridão.',
+    choices: [{ t: 'Mantenha-se ao largo; vou acender uma lanterna e marcar o canal.', d: 'longe' }, { t: 'Venha direto pela bóia cega; é o caminho mais rápido, mas arriscado.', d: 'veio' }] },
+  { from: 'Baleeiro Astral', tone: 'voz cansada, irônica e um pouco supersticiosa', at: [farStone.x, farStone.top + 1.3, farStone.z],
+    text: 'Aqui fala o Baleeiro Astral, embora eu esteja sem baleeiras faz vinte anos e navegando só por teimosia. Nosso motor engasgou no escuro, morreu de vez, e agora estamos à deriva com a maré puxando para leste. O que me tira do sério é ver esse farol apagado; sempre achei que luz de costa não dormia. Se alguém estiver aí, responda com um rumo seguro antes que eu precise confiar no cheiro de algas e na fé dos homens velhos.',
+    choices: [{ t: 'Minta uma direção segura e ganhe tempo para ajudá-los.', d: 'veio' }, { t: 'Admita que não vê nada e peça que lancem âncora já.', d: 'longe' }] },
 ];
 const envGeo = new THREE.BoxGeometry(0.95, 0.62, 0.05);
 const envMat = new THREE.MeshStandardMaterial({ color: '#fff5df', emissive: '#f2a065', emissiveIntensity: 0.7 });
