@@ -303,11 +303,21 @@ scene.add(glow);
 
 /* ---------- cartas ---------- */
 const LETTERS = [
-  { from: 'Vapor Aurora', text: 'Perdemos o rumo na neblina. Alguém ainda cuida do farol?', at: [-7, 1.3, 10] },
-  { from: 'Pesqueiro Maré Alta', text: 'Três pessoas a bordo e o rádio falhando. Acenda quando puder.', at: [52, 2.1, -2] },
-  { from: 'Escuna Santa Inês', text: 'O porto sumiu do mapa. Só confiamos na sua luz.', at: [-55, 2.5, -16] },
-  { from: 'Barca de Correio 12', text: 'Trazemos cartas para a sua ilha. Faz anos que ninguém responde.', at: [spiral[7].x, spiral[7].top + 1.3, spiral[7].z] },
-  { from: 'Veleiro Sem Nome', text: 'Não diga a ninguém que passamos por aqui. Mas acenda.', at: [farStone.x, farStone.top + 1.3, farStone.z] },
+  { from: 'Vapor Aurora', tone: 'capitã exausta, voz firme', at: [-7, 1.3, 10],
+    text: 'Perdemos o rumo na neblina e a bússola enlouqueceu. Temos vinte passageiros a bordo. Alguém ainda cuida do farol?',
+    choices: [{ t: 'Sigam minha voz, eu guio vocês até o cais.', d: 'veio' }, { t: 'Lancem âncora e esperem clarear.', d: 'longe' }] },
+  { from: 'Pesqueiro Maré Alta', tone: 'pescador nervoso, rádio falhando', at: [52, 2.1, -2],
+    text: 'Três pessoas a bordo, água entrando no porão e o rádio morrendo. Se eu forçar o motor até a ilha, pode ser o fim dele. O que eu faço?',
+    choices: [{ t: 'Force o motor e venha pelo canal leste.', d: 'veio' }, { t: 'Poupe o barco e fique longe das pedras.', d: 'longe' }] },
+  { from: 'Escuna Santa Inês', tone: 'contramestre desconfiado', at: [-55, 2.5, -16],
+    text: 'O porto sumiu do mapa e a tripulação só fala em voltar. Eu confio na sua luz, mas ela está apagada. Por que deveria seguir você?',
+    choices: [{ t: 'Porque vou acender esta noite. Venham.', d: 'veio' }, { t: 'Não sigam. Voltem para alto-mar.', d: 'longe' }] },
+  { from: 'Barca de Correio 12', tone: 'carteira bem-humorada', at: [spiral[7].x, spiral[7].top + 1.3, spiral[7].z],
+    text: 'Trago cartas para a sua ilha. Faz anos que ninguém responde, e eu já estava desistindo da rota. Ainda tem alguém aí para receber?',
+    choices: [{ t: 'Tem sim. Pode atracar, estou esperando.', d: 'veio' }, { t: 'Deixe as cartas na boia e siga viagem.', d: 'longe' }] },
+  { from: 'Veleiro Sem Nome', tone: 'voz baixa, com pressa', at: [farStone.x, farStone.top + 1.3, farStone.z],
+    text: 'Não diga a ninguém que passamos por aqui. Levamos gente que precisa desaparecer. Só preciso saber se o canal está livre.',
+    choices: [{ t: 'Canal livre. Passem junto da ilha.', d: 'veio' }, { t: 'Não quero saber. Fiquem longe daqui.', d: 'longe' }] },
 ];
 const envGeo = new THREE.BoxGeometry(0.95, 0.62, 0.05);
 const envMat = new THREE.MeshStandardMaterial({ color: '#fff5df', emissive: '#f2a065', emissiveIntensity: 0.7 });
@@ -430,7 +440,7 @@ function reset() {
   LETTERS.forEach((l) => { l.got = false; l.mesh.visible = l.ray.visible = true; });
   $('contagem').textContent = 'Cartas 0/5';
   $('carta').classList.remove('on');
-  story.gen++; story.history = []; story.next = null; story.atual = null;
+  story.gen++; story.history = []; story.atual = null;
   story.chamando = false; story.navioAtual = null; story.guiados = 0;
   hideRadio();
   limparNavios();
@@ -575,22 +585,27 @@ function win() {
   glow.material.opacity = 0.75;
   sfx.win(); flash(0.5);
   releaseKeys();
-  const gen = story.gen, tempo = fmt(elapsed);
-  showRadio({ centro: true, tag: 'Amanhecer', nome: 'Farol aceso', texto: 'O rádio está contando o que aconteceu com cada navio…', escolhas: [] });
-  post('/api/game/epilogue', { history: story.history }).catch(() => null).then((d) => {
-    if (gen !== story.gen) return;
-    const texto = (d && d.text) || `Ao amanhecer, a luz alcançou o mar. ${story.history.map((h) => `${h.name} ouviu: "${h.choice}"`).join(' ')} O faroleiro nunca soube quantos chegaram ao porto.`;
-    showRadio({ centro: true, tag: `Epílogo · ${tempo}`, nome: 'Farol aceso', texto, escolhas: ['Fechar e olhar o mar'] });
-  });
+  const salvos = story.history.filter((h) => h.destino === 'veio').length;
+  const fecho = salvos >= 4 ? 'O cais amanheceu cheio, e a ilha voltou a ter nome nos mapas.'
+    : salvos >= 2 ? 'Nem todos chegaram, mas quem chegou contou que havia alguém acordado na ilha.'
+      : 'O farol acendeu para um mar quase vazio, e o rádio ficou em silêncio.';
+  const texto = `${story.history.map((h) => `${h.name} ${FINAL[h.destino]}`).join(' ')} ${fecho}`;
+  showRadio({ centro: true, tag: `Epílogo · ${fmt(elapsed)}`, nome: 'Farol aceso', texto, escolhas: ['Fechar e olhar o mar'] });
 }
 
-/* ---------- narrativa: as mensagens vêm da IA do Rádio do Farol, criado no Emergent ---------- */
-const API = 'https://navios-no-farol--8gq73n0m.preview.emergentagent.com';
-const RESPOSTAS_GRAVADAS = ['A luz vai acender. Venham devagar.', 'Fiquem longe das pedras até o amanhecer.'];
-const story = { history: [], gen: 0, next: null, atual: null, chamando: false, prazo: 0, prazoTotal: 1, digitando: null, navioAtual: null };
+/* ---------- narrativa: mensagens fixas, sem servidor; cada chamada comenta o destino do navio anterior ---------- */
+const story = { history: [], gen: 0, atual: null, chamando: false, prazo: 0, prazoTotal: 1, digitando: null, navioAtual: null };
 const SEM_RESPOSTA = 'O faroleiro não respondeu.';
-// Lê a resposta escolhida pela IA e decide o que o navio faz no mar.
-const AFASTA = /recu|longe|afast|saia|sair|ocult|fiqu|dist[aâ]ncia|aguard|espere|[aâ]ncora|ancor|pare\b/i;
+const ECO = {
+  veio: (n) => `Vimos o navio ${n} chegar ao cais, então sabemos que tem alguém aí. `,
+  longe: (n) => `Ouvimos que você mandou o navio ${n} ficar longe. Espero ter mais sorte. `,
+  nada: (n) => `O navio ${n} chamou e ninguém respondeu. Por favor, responda desta vez. `,
+};
+const FINAL = {
+  veio: 'chegou ao cais antes do amanhecer.',
+  longe: 'manteve distância e seguiu viagem sem nunca tocar a ilha.',
+  nada: 'não recebeu resposta e desapareceu no mar.',
+};
 const DESTINOS = { veio: 'veio ao porto', longe: 'manteve distância', nada: 'sem resposta' };
 
 sfx.radio = () => { noise(0.3, 1800, 0.12, 'bandpass'); tone(880, 0.1, 0.09, 0.05, 'square'); tone(880, 0.1, 0.09, 0.22, 'square'); };
@@ -664,17 +679,6 @@ function hudRadio(ativa, texto) {
   $('radioHudTexto').textContent = texto;
 }
 
-function post(path, body, ms = 30000) {
-  const ctl = new AbortController();
-  const t = setTimeout(() => ctl.abort(), ms);
-  return fetch(API + path, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctl.signal,
-  }).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }).finally(() => clearTimeout(t));
-}
-// Pede o próximo navio assim que o jogador responde, para a carta abrir sem espera.
-function prefetch() {
-  story.next = { p: post('/api/game/ship', { history: story.history.slice() }).catch(() => null) };
-}
 function releaseKeys() { Object.keys(keys).forEach((k) => { keys[k] = false; }); }
 function showRadio({ centro = false, tag, nome, tom = '', texto, escolhas, digitar = false }) {
   $('radio').classList.toggle('centro', centro);
@@ -701,21 +705,18 @@ function showRadio({ centro = false, tag, nome, tom = '', texto, escolhas, digit
 }
 function hideRadio() { $('radio').hidden = true; story.digitando = null; }
 
-async function openRadio(l) {
-  const gen = story.gen;
+function openRadio(l) {
   story.chamando = true;
-  sfx.radio();
-  hudRadio(true, 'Canal 16 · sintonizando');
-  showRadio({ tag: 'Chamada recebida', nome: 'Navio não identificado', texto: 'Estática no canal 16…', escolhas: [] });
-  const ship = story.next ? await story.next.p : null;
-  if (gen !== story.gen) return;
-  const ok = ship && ship.name && ship.message && Array.isArray(ship.choices) && ship.choices.length >= 2;
-  story.atual = ok ? ship : { name: l.from, tone: 'mensagem gravada', problem: 'sinal fraco', message: l.text, choices: RESPOSTAS_GRAVADAS };
+  const ultimo = story.history[story.history.length - 1];
+  story.atual = {
+    name: l.from, tone: l.tone, message: (ultimo ? ECO[ultimo.destino](ultimo.name) : '') + l.text,
+    choices: l.choices.map((c) => c.t), destinos: l.choices.map((c) => c.d),
+  };
   story.navioAtual = criarNavio(story.atual.name);
   sfx.radio();
   hudRadio(true, `Canal 16 · ${story.atual.name}`);
   showRadio({
-    tag: ok ? 'Ao vivo · responda' : 'Sinal fraco · mensagem gravada',
+    tag: 'Chamada recebida · responda',
     nome: story.atual.name, tom: story.atual.tone, texto: story.atual.message, escolhas: story.atual.choices.slice(0, 2), digitar: true,
   });
   // Tempo para ler e responder. Se acabar, o silêncio também entra na história.
@@ -743,8 +744,8 @@ function choose(i) {
   const semResposta = i < 0;
   if (!semResposta && !s.choices[i]) return;
   const escolha = semResposta ? SEM_RESPOSTA : s.choices[i];
-  story.history.push({ name: s.name, tone: s.tone || '', problem: s.problem || '', message: s.message, choice: escolha });
-  const destino = semResposta ? 'nada' : AFASTA.test(escolha) ? 'longe' : 'veio';
+  const destino = semResposta ? 'nada' : s.destinos[i];
+  story.history.push({ name: s.name, choice: escolha, destino });
   mandarNavio(story.navioAtual, destino);
   registrarDestino(s.name, destino);
   // Cada navio guiado até o porto deixa a lâmpada mais forte.
@@ -758,7 +759,6 @@ function choose(i) {
   story.atual = null; story.navioAtual = null; story.chamando = false;
   hideRadio();
   hudRadio(false, 'Canal 16 · em silêncio');
-  if (story.history.length < LETTERS.length) prefetch();
 }
 
 // Texto chegando pelo rádio e relógio da chamada; o jogo não para enquanto isso.
@@ -853,7 +853,7 @@ function frame(now) {
 const tela = $('tela');
 function begin() {
   initAudio();
-  if (state === 'menu') { reset(); prefetch(); }
+  if (state === 'menu') reset();
   tela.hidden = true;
   state = elapsed > 0 && collected === LETTERS.length && beam.visible ? 'won' : 'play';
   const canvas = renderer.domElement;
@@ -887,7 +887,7 @@ addEventListener('keydown', (e) => {
   keys[e.code] = true;
   if (e.code === 'Space') P.buffer = MOVE.buffer;
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.dashPressed = true;
-  if (e.code === 'KeyR' && ['play', 'won', 'epilogue'].includes(state)) { reset(); prefetch(); state = 'play'; }
+  if (e.code === 'KeyR' && ['play', 'won', 'epilogue'].includes(state)) { reset(); state = 'play'; }
   if (e.code === 'Digit1' || e.code === 'Numpad1') choose(0);
   if (e.code === 'Digit2' || e.code === 'Numpad2') choose(1);
 });
